@@ -403,3 +403,31 @@ table.resumo tr.total td { font-weight: 800; background: var(--superficie-2); bo
   .imp-dept tr { break-inside: avoid; }
   .s-at { background: #DCFCE7; } .s-fe { background: #DBEAFE; } .s-af { background: #FFEDD5; } .s-de { background: #FEE2E2; }
 }
+
+/* ================= 1.2.0 ================= */
+/* quadro mais compacto: cabe tudo na tela do computador sem rolar para o lado */
+table.ql { font-size: .72rem; min-width: 0; table-layout: auto; }
+table.ql th, table.ql td { padding: 5px 5px; }
+table.ql thead tr.cols th { font-size: .66rem; white-space: normal; line-height: 1.15; }
+table.ql thead tr.donos th { font-size: .64rem; padding: 4px; }
+table.ql td.nome { min-width: 120px; }
+table.ql td.escala { white-space: normal; min-width: 92px; max-width: 130px; font-size: .68rem; line-height: 1.2; }
+table.ql td.quebra { min-width: 90px; max-width: 180px; font-size: .7rem; line-height: 1.2; }
+table.ql .badge { font-size: .64rem; padding: 2px 7px; }
+.dept-corpo { padding: 2px 12px 14px; gap: 10px; }
+.cargo-tit { padding-top: 6px; }
+.cargo-tit strong { font-size: .84rem; }
+.btn-peq { min-height: 32px; padding: 4px 12px; font-size: .82rem; }
+.us-tab tr.inativo td { opacity: .55; }
+.us-form { display: grid; gap: 12px; }
+.janela.larga { width: min(760px, calc(100% - 32px)); }
+.hist { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.hist li { border: 1px solid var(--borda); border-left: 4px solid var(--azul); border-radius: 10px; padding: 9px 12px; background: var(--superficie-2); }
+.hist-cab { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; color: var(--texto); }
+.hist-cab span { color: var(--texto-suave); }
+.hist-mud { border-collapse: collapse; font-size: .8rem; }
+.hist-mud th { text-align: left; color: var(--texto-suave); font-weight: 700; padding: 2px 10px 2px 0; width: 130px; white-space: nowrap; vertical-align: top; }
+.hist-mud td { padding: 2px 6px; color: var(--texto); vertical-align: top; }
+.hist-mud td.de { color: var(--texto-fraco); text-decoration: line-through; }
+.hist-mud td.seta-h { color: var(--texto-fraco); width: 14px; }
+.hist-mud td.para { font-weight: 600; }
