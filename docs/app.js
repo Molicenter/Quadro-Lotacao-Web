@@ -100,6 +100,7 @@ const IC = {
   seta: '<svg class="seta" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="m9 6 6 6-6 6"/></svg>',
   busca: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
   mais: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg>',
   atualizar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>',
 };
 
@@ -216,7 +217,8 @@ let dados = null;           // resposta do ql_web_quadro
 let linhas = [];            // quadro montado (Senior + lançamentos)
 const est = { escopo: lerLocal("ql_web_escopo") || "TL", filtro: "TODOS", busca: "", abertos: {}, todosAbertos: false };
 
-function pagina() { const h = location.hash.replace(/^#\/?/, ""); return ["quadro", "importar"].includes(h) ? h : "quadro"; }
+const PAGINAS = ["quadro", "efet", "resumo", "orcado", "importar"];
+function pagina() { const h = location.hash.replace(/^#\/?/, ""); return PAGINAS.includes(h) ? h : "quadro"; }
 window.addEventListener("hashchange", () => { if (sessao) render(); });
 
 function iniciarApp() {
@@ -248,7 +250,7 @@ async function carregar(manterRolagem) {
 function montarNav() {
   const pg = pagina();
   const itens = [["quadro", "Quadro de Lotação", IC.quadro, true]];
-  itens.push(["efet", "Relatório de Efetividade", IC.efet, false], ["resumo", "Resumo por Loja", IC.resumo, false], ["orcado", "QL Orçado", IC.orcado, false]);
+  itens.push(["efet", "Relatório de Efetividade", IC.efet, true], ["resumo", "Resumo por Loja", IC.resumo, true], ["orcado", "QL Orçado", IC.orcado, true]);
   if (podeImportar()) itens.push(["importar", "Atualizar banco (Excel)", IC.importar, true]);
   $("#nav").innerHTML = '<div class="nav-rotulo">Quadro</div>' + itens.map(([id, nome, ic, pronto]) =>
     `<button type="button" data-pg="${id}" class="${pg === id ? "ativo" : ""}"${pronto ? "" : ' data-embreve="1"'}>${ic}<span>${nome}</span>${pronto ? "" : '<span class="em-breve">etapa 2</span>'}</button>`).join("");
@@ -262,7 +264,6 @@ function montarNav() {
 $("#nav").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-pg]");
   if (!b) return;
-  if (b.dataset.embreve) return toast("Essa tela entra na etapa 2. Por enquanto continue usando o Streamlit para ela.");
   location.hash = "#/" + b.dataset.pg;
 });
 
@@ -280,7 +281,7 @@ function montarSeletor() {
   sel.innerHTML = opts.map((o) => `<option value="${o}"${o === est.escopo ? " selected" : ""}>${esc(nomeEscopo(o))}</option>`).join("");
 }
 $("#sel-loja").addEventListener("change", (e) => {
-  est.escopo = e.target.value; est.abertos = {}; est.todosAbertos = false;
+  est.escopo = e.target.value; est.abertos = {}; est.todosAbertos = false; efet.dados = null;
   gravarLocal("ql_web_escopo", est.escopo);
   carregar();
 });
@@ -292,6 +293,10 @@ function render() {
   $("#pil-senior").textContent = imp ? `Senior: ${dataHora(imp.em)}` : "Senior: ainda não importado";
   const pg = pagina();
   $("#rotulo-loja").hidden = pg === "importar";
+  const nomeEsc = nomeEscopo(sessao.loja_fixa != null ? String(sessao.loja_fixa) : est.escopo);
+  if (pg === "efet") { $("#pg-titulo").textContent = "Relatório de Efetividade — " + nomeEsc; $("#pg-sub").textContent = "Vagas abertas x concluídas no período (pela Data Abertura e Data Admissão)"; telaEfetividade(); return; }
+  if (pg === "resumo") { $("#pg-titulo").textContent = "Resumo de Situação por Loja — " + nomeEsc; $("#pg-sub").textContent = "Mesma contagem dos cards do quadro, aberta por loja"; telaResumo(); return; }
+  if (pg === "orcado") { $("#pg-titulo").textContent = "QL Orçado — " + nomeEsc; $("#pg-sub").textContent = "Organograma de funções orçadas · Real = Ativos + Férias do quadro"; telaOrcado(); return; }
   if (pg === "importar") {
     $("#pg-titulo").textContent = "Atualizar banco do Senior";
     $("#pg-sub").textContent = "Envie o Excel exportado do Senior (Banco QL.xlsx) · substitui o quadro do app";
@@ -441,6 +446,7 @@ function telaQuadro() {
   h += `<div class="barra-ferr"><label class="busca">${IC.busca}<input id="busca" type="search" placeholder="Buscar colaborador, cargo ou candidato…" value="${esc(est.busca)}" autocomplete="off"></label>
     <button type="button" class="btn btn-borda" data-acao="expandir">${est.todosAbertos ? "Recolher tudo" : "Expandir tudo"}</button>
     <button type="button" class="btn btn-borda" data-acao="atualizar" title="Buscar de novo no banco">${IC.atualizar}Atualizar</button>
+    <button type="button" class="btn btn-borda" data-acao="imprimir" title="Imprimir ou salvar em PDF o quadro como está na tela (loja e filtro)">${IC.pdf}PDF do quadro</button>
     ${podeNovo() ? `<button type="button" class="btn btn-primario" data-acao="novo">${IC.mais}Cadastrar novo</button>` : ""}</div>`;
 
   if (est.filtro !== "TODOS") {
@@ -504,6 +510,7 @@ $("#conteudo").addEventListener("click", (e) => {
   if (a.dataset.acao === "expandir") { est.todosAbertos = !est.todosAbertos; est.abertos = {}; telaQuadro(); }
   else if (a.dataset.acao === "atualizar") carregar(true);
   else if (a.dataset.acao === "novo") abrirGaveta(null);
+  else if (a.dataset.acao === "imprimir") imprimirQuadro();
 });
 $("#conteudo").addEventListener("toggle", (e) => {
   const d = e.target;

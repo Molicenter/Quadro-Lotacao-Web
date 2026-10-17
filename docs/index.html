@@ -11,7 +11,7 @@
     try { var t = localStorage.getItem("ql_web_tema"); if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; } catch (e) {}
     try { if (localStorage.getItem("ql_web_menu") === "fechado") document.documentElement.classList.add("menu-fechado"); } catch (e) {}
   </script>
-  <link rel="stylesheet" href="style.css?v=1.0.0">
+  <link rel="stylesheet" href="style.css?v=1.1.0">
 </head>
 <body>
   <!-- =================== LOGIN =================== -->
@@ -90,10 +90,14 @@
   <div class="veu veu-janela" id="veu-janela" hidden></div>
   <div class="janela" id="janela" role="dialog" aria-modal="true" hidden></div>
 
+  <!-- área de impressão (PDF do quadro) -->
+  <div class="so-impressao" id="impressao"></div>
+
   <div class="toast" id="toast" role="status" hidden></div>
   <div class="carregando" id="carregando" hidden><div class="spinner"></div></div>
 
-  <script src="config.js?v=1.0.0"></script>
-  <script src="app.js?v=1.0.0"></script>
+  <script src="config.js?v=1.1.0"></script>
+  <script src="app.js?v=1.1.0"></script>
+  <script src="relatorios.js?v=1.1.0"></script>
 </body>
 </html>
