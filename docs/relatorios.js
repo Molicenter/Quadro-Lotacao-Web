@@ -88,8 +88,10 @@ function calcularEfet(d, ini, fim, incluirSaidos) {
     const aberta = (abertaAteFim && naoFechadaAntes) || conc;
     const atendida = String(r.st ?? "").trim().toUpperCase() === "REQUISIÇÃO ATENDIDA";
     const concRH = atendida && temAd && dAd >= ini && dAd <= fim;
+    const dias = concRH && dAb ? Math.round((dAd - dAb) / 86400000) : null;          // tempo para preencher
+    const idade = aberta && !concRH && dAb ? Math.round((fim - dAb) / 86400000) : null; // há quantos dias aberta (no fim do período)
     return { loja: Number(r.l), nome: titulo(r.n), dept: limpar(r.d), funcao: limpar(r.f), ab: fmtBR(r.ab), ad: fmtBR(r.ad), st: limpar(r.st),
-      aberta, conc, concRH, atendidaSemData: atendida && !temAd, atendidaFora: atendida && temAd && !concRH };
+      aberta, conc, concRH, dias: dias != null && dias >= 0 ? dias : null, idade, atendidaSemData: atendida && !temAd, atendidaFora: atendida && temAd && !concRH };
   });
   const porLoja = (lista) => { const m = new Map(); for (const x of lista) { if (!m.has(x.l)) m.set(x.l, new Map()); if (!m.get(x.l).has(x.nn)) m.get(x.l).set(x.nn, x); } return m; };
   const roster = porLoja(d.roster), ledger = porLoja(d.ledger);
@@ -162,6 +164,15 @@ function desenharEfet() {
   const { linhas: tab, snap } = tabelaFinal(d, c);
   const tot = tab.reduce((a, t) => ({ req: a.req + t.req, ab: a.ab + t.ab, dp: a.dp + t.dp, rh: a.rh + t.rh }), { req: 0, ab: 0, dp: 0, rh: 0 });
   tot.pct = pct(tot.rh, tot.req);
+  // tempo para preencher (Data Abertura → Data Admissão das Concluídas RH) e vagas abertas há mais de 30 dias
+  const media = (xs) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+  const tempo = (l) => {
+    const rs = c.linhasRel.filter((r) => r.aberta && (l == null || r.loja === l));
+    return { media: media(rs.map((r) => r.dias).filter((x) => x != null)), velhas: rs.filter((r) => r.idade != null && r.idade > 30).length };
+  };
+  tab.forEach((t) => Object.assign(t, tempo(t.l)));
+  Object.assign(tot, tempo(null));
+  const txtDias = (v) => (v == null ? "-" : `${v} dia${v === 1 ? "" : "s"}`);
 
   const meses = mesesAtalho();
   const iguais = (a, b) => a && b && a.getTime() === b.getTime();
@@ -182,14 +193,14 @@ function desenharEfet() {
     <div class="kpi k-ALTERADOS" style="--cor:${COR_EF.req}"><strong class="num">${tot.req}</strong><span>Requisições</span><small>abertas e/ou concluídas no período</small></div>
     <div class="kpi k-ADMITIDOS" style="--cor:${COR_EF.ab}"><strong class="num">${tot.ab}</strong><span>Abertas</span><small>sem Requisição atendida no período</small></div>
     <div class="kpi" style="--cor:${COR_EF.dp}"><strong class="num">${tot.dp}</strong><span>Concluídas DP</span><small>admitidos no Senior</small></div>
-    <div class="kpi" style="--cor:${COR_EF.rh}"><strong class="num">${tot.rh} <em class="ef-pct ${tot.pct >= 50 ? "bom" : "ruim"}">${tot.pct}%</em></strong><span>Concluídas RH</span><small>base do % (sobre Requisições)</small></div></div>`;
+    <div class="kpi" style="--cor:${COR_EF.rh}"><strong class="num">${tot.rh} <em class="ef-pct ${tot.pct >= 50 ? "bom" : "ruim"}">${tot.pct}%</em></strong><span>Concluídas RH</span><small>base do % · preenchidas em ${tot.media == null ? "-" : tot.media + " dias"} em média</small></div></div>`;
 
   h += `<div class="cartao"><h3>Por loja<small>gerado em ${esc(dataHora(new Date().toISOString()))}</small></h3>
     <div class="legenda">${Object.keys(ROT_EF).map((k) => `<span><i style="background:${COR_EF[k]}"></i>${ROT_EF[k]}</span>`).join("")}<span><b class="ef-pct-leg">%</b> = Concluídas RH ÷ Requisições</span></div>
     <div class="grafico-wrap" id="ef-grafico">${graficoEfet(tab, tot)}<div class="dica-graf" id="ef-dica" hidden></div></div></div>`;
 
-  h += `<div class="cartao"><div class="tabela-wrap"><table class="resumo num"><thead><tr><th>Loja</th><th>Requisições</th><th>Abertas</th><th>Concluídas DP</th><th>Concluídas RH</th><th>%</th></tr></thead><tbody>
-    ${[...tab, { l: "Total", ...tot }].map((t) => `<tr${t.l === "Total" ? ' class="total"' : ""}><td>${t.l === "Total" ? "Total" : lojaCurta(t.l)}</td><td>${t.req}</td><td>${t.ab}</td><td>${t.dp}</td><td>${t.rh}</td><td><span class="ef-pct ${t.pct >= 50 ? "bom" : "ruim"}">${t.pct}%</span></td></tr>`).join("")}
+  h += `<div class="cartao"><div class="tabela-wrap"><table class="resumo num"><thead><tr><th>Loja</th><th>Requisições</th><th>Abertas</th><th>Concluídas DP</th><th>Concluídas RH</th><th>%</th><th title="Média de dias entre a Data Abertura e a Data Admissão das vagas Concluídas RH">Tempo médio p/ preencher</th><th title="Vagas ainda abertas no fim do período com mais de 30 dias desde a Data Abertura">Abertas há +30 dias</th></tr></thead><tbody>
+    ${[...tab, { l: "Total", ...tot }].map((t) => `<tr${t.l === "Total" ? ' class="total"' : ""}><td>${t.l === "Total" ? "Total" : lojaCurta(t.l)}</td><td>${t.req}</td><td>${t.ab}</td><td>${t.dp}</td><td>${t.rh}</td><td><span class="ef-pct ${t.pct >= 50 ? "bom" : "ruim"}">${t.pct}%</span></td><td>${txtDias(t.media)}</td><td>${t.velhas ? `<span class="idade i3">${t.velhas}</span>` : "0"}</td></tr>`).join("")}
     </tbody></table></div><div style="margin-top:12px"><button type="button" class="btn btn-borda" id="ef-csv">${IC.pdf}Baixar tabela (CSV)</button></div></div>`;
 
   h += diagnosticoEfet(d, c, tab, tot, snap);
@@ -197,7 +208,7 @@ function desenharEfet() {
   ligarFiltrosEfet(meses);
   ligarGrafico(tab, tot);
   $("#ef-csv").onclick = () => baixarCSV(`Efetividade_${dataISO(efet.ini)}_${dataISO(efet.fim)}_${nomeEscopo(escopoAtual()).replace(/\W+/g, "_")}.csv`,
-    [["Loja", "Requisições", "Abertas", "Concluídas DP", "Concluídas RH", "%"], ...tab.map((t) => [lojaCurta(t.l), t.req, t.ab, t.dp, t.rh, t.pct + "%"]), ["Total", tot.req, tot.ab, tot.dp, tot.rh, tot.pct + "%"]]);
+    [["Loja", "Requisições", "Abertas", "Concluídas DP", "Concluídas RH", "%", "Tempo médio p/ preencher (dias)", "Abertas há +30 dias"], ...tab.map((t) => [lojaCurta(t.l), t.req, t.ab, t.dp, t.rh, t.pct + "%", t.media ?? "", t.velhas]), ["Total", tot.req, tot.ab, tot.dp, tot.rh, tot.pct + "%", tot.media ?? "", tot.velhas]]);
 }
 
 function ligarFiltrosEfet(meses) {
@@ -263,7 +274,7 @@ function diagnosticoEfet(d, c, tab, tot, snap) {
       <li><b>Requisições</b> no período: ${tot.req} · <b>Abertas</b>: ${tot.ab} · <b>Concluídas DP</b>: ${tot.dp} · <b>Concluídas RH</b> (base do %): ${tot.rh}</li>
       <li>Admitidos no período que <b>já saíram</b> do Senior: ${sai.length} (${efet.incluirSaidos ? "incluídos" : "não incluídos"} na conta)</li>
     </ul>
-    <h4>Vagas contadas como Requisições (${req.length})</h4>${tabela(["Loja", "Nome", "Dept", "Função", "Data Abertura", "Data Admissão", "Situação"], req, (r) => [p2(r.loja), r.nome, r.dept, r.funcao, r.ab, r.ad, situ(r)])}
+    <h4>Vagas contadas como Requisições (${req.length})</h4>${tabela(["Loja", "Nome", "Dept", "Função", "Data Abertura", "Data Admissão", "Situação", "Dias"], req, (r) => [p2(r.loja), r.nome, r.dept, r.funcao, r.ab, r.ad, situ(r), r.dias != null ? r.dias + " p/ preencher" : r.idade != null ? r.idade + " em aberto" : ""])}
     <h4>Pessoas contadas como Admitidas DP (${dp.length})</h4>${tabela(["Loja", "Nome admitido", "Dept", "Função", "Data Admissão", "Situação"], dp, (r) => [p2(r.loja), r.nome, r.dept, r.funcao, r.ad, r.saiu ? "Já saiu" : "No Senior"])}
     <h4>Vagas contadas como Admitidas RH (${rh.length})</h4>${tabela(["Loja", "Nome", "Dept", "Função", "Status RH", "Data Abertura", "Data Admissão"], rh, (r) => [p2(r.loja), r.nome, r.dept, r.funcao, r.st, r.ab, r.ad])}
     ${sai.length ? `<h4>Admitidos no período que já saíram (${sai.length})</h4>${tabela(["Loja", "Nome admitido", "Dept", "Função", "Data Admissão"], sai, (r) => [p2(r.loja), r.nome, r.dept, r.funcao, r.ad])}` : ""}

@@ -104,7 +104,7 @@ async function exportarExcel() {
     const ws = wb.addWorksheet("Quadro", { views: [{ state: "frozen", ySplit: 5 }] });
     const cols = [["Departamento", 18, "a"], ["Cargo", 18, "a"], ["Orçado cargo", 9, "a"], ["Real cargo", 8, "a"], ["Status", 11, "a"], ["Loja", 6, "a"], ["Nome do Colaborador", 36, "a"], ["Horário Sistema", 30, "a"],
       ["Data Abertura", 12, "g"], ["Responsável", 16, "g"], ["Horário Contrato", 30, "g"], ["Sexo", 11, "g"], ["Motivo", 22, "g"], ["Observação", 36, "g"],
-      ["Status RH", 26, "r"], ["Candidato", 30, "r"], ["Data Admissão", 12, "r"]];
+      ["Status RH", 26, "r"], ["Candidato", 30, "r"], ["Data Admissão", 12, "r"], ["Dias em aberto", 9, "r"]];
     ws.columns = cols.map(([, w]) => ({ width: w }));
     const filtro = est.filtro !== "TODOS" ? CARDS.find((x) => x[0] === est.filtro)[1] : "Todos";
     ws.getCell("A1").value = "Molicenter — Quadro de Lotação (QL)";
@@ -113,7 +113,7 @@ async function exportarExcel() {
     ws.getCell("A2").font = { color: { argb: "FF5B6B78" } };
     const cor = { a: "FF0B3D63", g: "FF047857", r: "FFBE123C" }, claro = { a: "FFDCEBF7", g: "FFDDF3EA", r: "FFFBE4EA" };
     // linha 4: donos · linha 5: colunas
-    [["a", 1, 8, "DONO: ANALISTA"], ["g", 9, 14, "DONO: GERENTE"], ["r", 15, 17, "DONO: RH"]].forEach(([k, c1, c2, t]) => {
+    [["a", 1, 8, "DONO: ANALISTA"], ["g", 9, 14, "DONO: GERENTE"], ["r", 15, 18, "DONO: RH"]].forEach(([k, c1, c2, t]) => {
       ws.mergeCells(4, c1, 4, c2);
       const c = ws.getCell(4, c1); c.value = t; c.alignment = { horizontal: "center" };
       c.font = { bold: true, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: cor[k] } };
@@ -130,7 +130,7 @@ async function exportarExcel() {
     rs.forEach((r) => {
       const of = orcFunc(m, r.dept, r.funcao);
       const linha = ws.addRow([r.dept, r.funcao, of ?? null, of != null ? real(r.dept, r.funcao) : null, ehDemitido(r) && !r.sitU.includes("ATIVO") ? "Demitido" : r.sit, r.loja, titulo(r.nome), sem(r.escala),
-        d_(r.abertura), sem(r.resp), sem(r.horario), sem(r.sexo), sem(r.motivo), sem(r.obs), sem(r.statusRh), sem(r.candidato), d_(r.admissao)]);
+        d_(r.abertura), sem(r.resp), sem(r.horario), sem(r.sexo), sem(r.motivo), sem(r.obs), sem(r.statusRh), sem(r.candidato), d_(r.admissao), diasEmAberto(r)]);
       linha.getCell(5).fill = { type: "pattern", pattern: "solid", fgColor: { argb: fundoSit(r) } };
       [9, 17].forEach((c) => (linha.getCell(c).numFmt = "dd/mm/yyyy"));
       linha.getCell(14).alignment = { wrapText: true, vertical: "top" };
@@ -163,3 +163,45 @@ async function exportarExcel() {
   } finally { carregando(false); }
 }
 function sitOrc(o, r) { if (o == null) return ""; const s = o - r; return s > 0 ? `${s} vaga${s > 1 ? "s" : ""}` : s === 0 ? "completo" : `${-s} acima`; }
+
+// ---------- FUNIL DO RH ----------
+// vagas em andamento (as mesmas do card Alterados) por Status RH, na ordem do processo
+const ORDEM_FUNIL = ["-", "Divulgação da vaga", "Triagem de Curriculuns", "Entrevista RH", "Entrevista Loja", "Validado pelo gerente", "Não Validado pelo gerente",
+  "Aguardando resposta Candidato", "Exame Admissional", "Documentação Admissão", "Previsão de Início", "Cancelado", "Desistencia Candidato"];
+const funil = { status: null };
+function telaFunil() {
+  const vagas = linhas.filter((r) => r.alterado);
+  const st = (r) => (vazio(r.statusRh) ? "-" : String(r.statusRh).trim());
+  const nomes = [...new Set([...ORDEM_FUNIL.filter((s) => vagas.some((r) => st(r) === s)), ...vagas.map(st).filter((s) => !ORDEM_FUNIL.includes(s)).sort(cmp)])];
+  const rot = (s) => (s === "-" ? "Sem status do RH" : s);
+  const lojas = [...new Set(vagas.map((r) => r.loja))].sort((a, b) => a - b);
+  const media = (xs) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null);
+  const linhasF = nomes.map((s) => {
+    const rs = vagas.filter((r) => st(r) === s);
+    const ds = rs.map(diasEmAberto).filter((x) => x != null);
+    return { s, n: rs.length, media: media(ds), velhas: ds.filter((d) => d > 30).length, porLoja: lojas.map((l) => rs.filter((r) => r.loja === l).length) };
+  });
+  const max = Math.max(1, ...linhasF.map((x) => x.n));
+  const saida = (s) => s === "Cancelado" || s === "Desistencia Candidato";
+  let h = `<div class="pagina"><div class="cartao"><h3>Onde as vagas estão<small>${vagas.length} vagas em andamento · mesma base do card Alterados</small></h3>`;
+  if (!vagas.length) { $("#conteudo").innerHTML = h + '<p class="vazio-msg">Nenhuma vaga em andamento nesta seleção.</p></div></div>'; return; }
+  h += `<div class="funil">${linhasF.map((x) => `<button type="button" class="funil-l${funil.status === x.s ? " sel" : ""}${saida(x.s) ? " saida" : ""}" data-st="${esc(x.s)}">
+      <span class="funil-n">${esc(rot(x.s))}</span>
+      <span class="funil-barra"><i style="width:${Math.max(2, (x.n / max) * 100)}%"></i></span>
+      <b class="num">${x.n}</b>
+      <span class="funil-d num">${x.media == null ? "" : `média ${x.media}d`}${x.velhas ? ` · <em>${x.velhas} com +30d</em>` : ""}</span></button>`).join("")}</div>
+    <p class="nota" style="margin-top:10px">Dias contados desde a Data Abertura. Clique numa etapa para ver as vagas.</p></div>`;
+  if (lojas.length > 1) {
+    h += `<div class="cartao"><h3>Por loja</h3><div class="tabela-wrap"><table class="resumo num"><thead><tr><th>Etapa</th>${lojas.map((l) => `<th>${p2(l)}</th>`).join("")}<th>Total</th></tr></thead><tbody>
+      ${linhasF.map((x) => `<tr><td>${esc(rot(x.s))}</td>${x.porLoja.map((n) => `<td>${n || '<span class="vazio">·</span>'}</td>`).join("")}<td><b>${x.n}</b></td></tr>`).join("")}
+      <tr class="total"><td>Total</td>${lojas.map((l) => `<td>${vagas.filter((r) => r.loja === l).length}</td>`).join("")}<td>${vagas.length}</td></tr></tbody></table></div></div>`;
+  }
+  if (funil.status != null && nomes.includes(funil.status)) {
+    const rs = vagas.filter((r) => st(r) === funil.status).map((r) => ({ r, d: diasEmAberto(r) })).sort((a, b) => (b.d ?? -1) - (a.d ?? -1));
+    h += `<div class="cartao"><h3>${esc(rot(funil.status))}<small>${rs.length} vagas · clique para editar</small></h3><div class="tabela-wrap"><table class="simples funil-tab"><thead><tr><th>Loja</th><th>Dept / Cargo</th><th>Colaborador (vaga)</th><th>Abertura</th><th>Dias</th><th>Motivo</th><th>Candidato</th><th>Responsável</th></tr></thead><tbody>
+      ${rs.map(({ r, d }) => `<tr data-linha-f="${r.i}"><td class="num">${p2(r.loja)}</td><td>${esc(r.dept)} · ${esc(r.funcao)}</td><td>${esc(titulo(r.nome))}</td><td class="num">${esc(r.abertura)}</td><td>${chipIdade(d) || "-"}</td><td>${esc(r.motivo)}</td><td>${esc(r.candidato)}</td><td>${esc(r.resp)}</td></tr>`).join("")}</tbody></table></div></div>`;
+  }
+  $("#conteudo").innerHTML = h + "</div>";
+  $$("[data-st]").forEach((b) => (b.onclick = () => { funil.status = funil.status === b.dataset.st ? null : b.dataset.st; telaFunil(); }));
+  $$("[data-linha-f]").forEach((tr) => (tr.onclick = () => abrirGaveta(linhas[+tr.dataset.linhaF])));
+}

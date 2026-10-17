@@ -102,6 +102,7 @@ const IC = {
   mais: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   pdf: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M12 18v-6M9 15l3 3 3-3"/></svg>',
   usuarios: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></svg>',
+  funil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>',
   excel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>',
   atualizar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5"/></svg>',
 };
@@ -219,7 +220,7 @@ let dados = null;           // resposta do ql_web_quadro
 let linhas = [];            // quadro montado (Senior + lançamentos)
 const est = { escopo: lerLocal("ql_web_escopo") || "TL", filtro: "TODOS", busca: "", abertos: {}, todosAbertos: false };
 
-const PAGINAS = ["quadro", "efet", "resumo", "orcado", "importar", "usuarios"];
+const PAGINAS = ["quadro", "efet", "funil", "resumo", "orcado", "importar", "usuarios"];
 function pagina() { const h = location.hash.replace(/^#\/?/, ""); return PAGINAS.includes(h) ? h : "quadro"; }
 window.addEventListener("hashchange", () => { if (sessao) render(); });
 
@@ -252,7 +253,7 @@ async function carregar(manterRolagem) {
 function montarNav() {
   const pg = pagina();
   const itens = [["quadro", "Quadro de Lotação", IC.quadro, true]];
-  itens.push(["efet", "Relatório de Efetividade", IC.efet, true], ["resumo", "Resumo por Loja", IC.resumo, true], ["orcado", "QL Orçado", IC.orcado, true]);
+  itens.push(["efet", "Relatório de Efetividade", IC.efet, true], ["funil", "Funil do RH", IC.funil, true], ["resumo", "Resumo por Loja", IC.resumo, true], ["orcado", "QL Orçado", IC.orcado, true]);
   if (podeImportar()) itens.push(["importar", "Atualizar banco (Excel)", IC.importar, true]);
   if (sessao.perfil === "analista") itens.push(["usuarios", "Usuários", IC.usuarios, true]);
   $("#nav").innerHTML = '<div class="nav-rotulo">Quadro</div>' + itens.map(([id, nome, ic, pronto]) =>
@@ -299,6 +300,7 @@ function render() {
   if (pg === "usuarios") { $("#pg-titulo").textContent = "Usuários"; $("#pg-sub").textContent = "Logins, perfis, lojas e senhas do QL"; telaUsuarios(); return; }
   const nomeEsc = nomeEscopo(sessao.loja_fixa != null ? String(sessao.loja_fixa) : est.escopo);
   if (pg === "efet") { $("#pg-titulo").textContent = "Relatório de Efetividade — " + nomeEsc; $("#pg-sub").textContent = "Vagas abertas x concluídas no período (pela Data Abertura e Data Admissão)"; telaEfetividade(); return; }
+  if (pg === "funil") { $("#pg-titulo").textContent = "Funil do RH — " + nomeEsc; $("#pg-sub").textContent = "Vagas em andamento por etapa do RH e há quantos dias estão abertas"; telaFunil(); return; }
   if (pg === "resumo") { $("#pg-titulo").textContent = "Resumo de Situação por Loja — " + nomeEsc; $("#pg-sub").textContent = "Mesma contagem dos cards do quadro, aberta por loja"; telaResumo(); return; }
   if (pg === "orcado") { $("#pg-titulo").textContent = "QL Orçado — " + nomeEsc; $("#pg-sub").textContent = "Organograma de funções orçadas · Real = Ativos + Férias do quadro"; telaOrcado(); return; }
   if (pg === "importar") {
@@ -483,6 +485,19 @@ function telaQuadro() {
   $("#conteudo").innerHTML = h + "</div>";
 }
 
+// dias em aberto de uma vaga (alterada, ainda sem Requisição atendida): 0–15 normal · 16–30 laranja · +30 vermelho
+function diasEmAberto(r) {
+  if (!r.alterado) return null;
+  const ab = lerData(r.abertura), hoje = lerData(dados.hoje) || hojeSP();
+  if (!ab) return null;
+  const d = Math.round((hoje - ab) / 86400000);
+  return d >= 0 ? d : null;
+}
+function chipIdade(d) { return d == null ? "" : `<span class="idade ${d > 30 ? "i3" : d > 15 ? "i2" : "i1"}" title="${d} dia(s) desde a abertura da vaga">${d}d</span>`; }
+function tdAbertura(r) {
+  if (vazio(r.abertura)) return '<td class="vazio num">-</td>';
+  return `<td class="num">${esc(r.abertura)}${chipIdade(diasEmAberto(r))}</td>`;
+}
 function corpoDept(ld, dept, m, real, global) {
   let h = '<div class="dept-corpo">';
   const funcs = [...new Set(ld.map((r) => r.funcao).filter((x) => x != null))].sort(cmp);
@@ -496,7 +511,7 @@ function corpoDept(ld, dept, m, real, global) {
     for (const r of lf) {
       const td = (v, cl = "") => (vazio(v) ? `<td class="vazio ${cl}">-</td>` : `<td class="${cl}">${esc(v)}</td>`);
       h += `<tr data-linha="${r.i}"${r.arquivada ? ' data-arquivada="1"' : ""} title="Clique para editar"><td>${badgeSit(r.sit)}</td>${global ? `<td class="cel-loja num">${p2(r.loja)}</td>` : ""}
-        <td class="nome">${esc(titulo(r.nome))}</td>${td(r.escala, "escala")}${td(r.abertura, "num")}${td(r.resp)}${td(r.horario, "escala")}${td(r.sexo)}${td(r.motivo)}${td(r.obs, "quebra")}
+        <td class="nome">${esc(titulo(r.nome))}</td>${td(r.escala, "escala")}${tdAbertura(r)}${td(r.resp)}${td(r.horario, "escala")}${td(r.sexo)}${td(r.motivo)}${td(r.obs, "quebra")}
         <td>${badgeRh(r.statusRh)}</td>${td(r.candidato, "quebra")}${td(r.admissao, "num")}</tr>`;
     }
     h += "</tbody></table></div></div>";
