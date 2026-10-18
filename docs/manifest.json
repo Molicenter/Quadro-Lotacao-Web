@@ -2,7 +2,6 @@
   "name": "Quadro de Lotação · Molicenter",
   "short_name": "QL Lojas",
   "description": "Quadro de lotação das lojas",
-  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
