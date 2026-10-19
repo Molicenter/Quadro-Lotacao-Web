@@ -609,11 +609,12 @@ function abrirGaveta(r) {
     <label class="campo cheio">Observação<textarea name="obs" maxlength="500" rows="2">${esc(r && !vazio(r.obs) ? r.obs : "")}</textarea></label></div></div>`;
 
   if (total) {
-    h += `<div class="grupo-dono g-r"><h5>Recursos Humanos (RH)<small>você edita</small></h5><div class="campos">
+    const atend = ehAtendida(r?.statusRh);
+    h += `<div class="grupo-dono g-r${atend ? " atendida" : ""}" id="grupo-rh"><h5>Recursos Humanos (RH)<small>você edita</small></h5><div class="campos">
       <label class="campo cheio">Status RH<select name="status_rh">${opcoes(OPCOES_STATUS_RH, r?.statusRh)}</select></label>
-      <label class="campo cheio">Candidato<input name="candidato" maxlength="120" value="${esc(r && !vazio(r.candidato) ? r.candidato : "")}"></label>
-      <label class="check cheio"><input type="checkbox" name="tem_admissao"${ad ? " checked" : ""}> Definir data de admissão</label>
-      <label class="campo" id="campo-admissao"${ad ? "" : " hidden"}>Data admissão<input type="date" name="admissao" value="${dataISO(ad || hoje)}"></label></div></div>`;
+      <label class="campo cheio"><span>Candidato<b class="req">*</b></span><input name="candidato" maxlength="120" placeholder="Nome de quem vai entrar na vaga" value="${esc(r && !vazio(r.candidato) ? r.candidato : "")}"></label>
+      <label class="check"><input type="checkbox" name="tem_admissao"${ad || atend ? " checked" : ""}> Definir data de admissão</label>
+      <label class="campo" id="campo-admissao"${ad || atend ? "" : " hidden"}><span>Data admissão<b class="req">*</b></span><input type="date" name="admissao" value="${dataISO(ad || hoje)}"></label></div></div>`;
   } else {
     const v = (x) => esc(r && !vazio(x) ? x : "-");
     h += `<div class="grupo-dono g-r bloq"><h5>Recursos Humanos (RH)<small>só leitura</small></h5><div class="campos">
@@ -655,7 +656,20 @@ $("#gaveta").addEventListener("change", (e) => {
     $('[name="funcao"]', g).innerHTML = f.map((x) => `<option>${esc(x)}</option>`).join("");
   }
   if (e.target.name === "tem_admissao") $("#campo-admissao").hidden = !e.target.checked;
+  if (e.target.name === "status_rh") {
+    const atend = ehAtendida(e.target.value);
+    $("#grupo-rh").classList.toggle("atendida", atend);
+    if (atend) {
+      // Requisição atendida: já liga a data de admissão e leva o foco para o candidato
+      $('[name="tem_admissao"]', g).checked = true;
+      $("#campo-admissao").hidden = false;
+      $("#grupo-rh").scrollIntoView({ block: "end", behavior: "smooth" });
+      const c = $('[name="candidato"]', g);
+      if (!c.value.trim()) c.focus({ preventScroll: true });
+    }
+  }
 });
+function ehAtendida(s) { return String(s ?? "").trim().toUpperCase() === "REQUISIÇÃO ATENDIDA"; }
 $("#gaveta").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target, r = gavetaLinha, novo = !r;
@@ -675,6 +689,13 @@ $("#gaveta").addEventListener("submit", async (e) => {
   if (podeTotal()) {
     p.status_rh = v("status_rh"); p.candidato = v("candidato").trim();
     p.admissao = f.elements.tem_admissao.checked ? br(v("admissao")) : "-";
+    if (ehAtendida(p.status_rh)) {
+      const falta = [!p.candidato && "Candidato", vazio(p.admissao) && "Data admissão"].filter(Boolean);
+      if (falta.length) {
+        f.elements[!p.candidato ? "candidato" : "admissao"]?.focus();
+        return toast("Requisição atendida precisa de: " + falta.join(" e ") + ".", "erro");
+      }
+    }
   } else {
     const falta = [["abertura", "Data Abertura"], ["resp", "Responsável"], ["horario", "Horário Contrato"], ["sexo", "Sexo"], ["motivo", "Motivo"]]
       .filter(([k]) => vazio(p[k])).map((x) => x[1]);

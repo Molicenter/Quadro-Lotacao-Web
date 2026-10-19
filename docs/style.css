@@ -232,6 +232,22 @@ td.cel-loja { font-weight: 800; color: var(--azul); }
 .gaveta header p { margin: 2px 0 0; font-size: .82rem; color: var(--texto-suave); }
 .btn-fechar { margin-left: auto; border: 0; background: var(--azul-claro); color: var(--azul); width: 36px; height: 36px; border-radius: 10px; font-size: 1.2rem; flex: none; }
 .gaveta .corpo { padding: 16px 20px; overflow-y: auto; display: grid; gap: 14px; flex: 1; align-content: start; }
+/* cada bloco ocupa a altura do seu conteúdo — sem isso, em tela baixa (notebook) os blocos encolhiam e cortavam os campos */
+.gaveta .corpo { grid-auto-rows: max-content; min-height: 0; overscroll-behavior: contain; }
+/* bloco RH: com Requisição atendida, candidato e data ficam destacados e o checkbox alinha com a data */
+.grupo-dono.g-r .check { align-self: end; min-height: 40px; }
+.grupo-dono.g-r.atendida { border-color: var(--dono-r); box-shadow: 0 0 0 3px var(--dono-r-claro); }
+.grupo-dono .req { display: none; color: var(--dono-r); margin-left: 2px; }
+.grupo-dono.atendida .req { display: inline; }
+.grupo-dono.atendida [name="candidato"], .grupo-dono.atendida [name="admissao"] { border-color: var(--dono-r); }
+@media (max-height: 820px) {
+  .gaveta header { padding: 10px 20px; }
+  .gaveta .corpo { padding: 12px 20px; gap: 10px; }
+  .gaveta footer { padding: 10px 20px; }
+  .grupo-dono .campos { padding: 10px 12px; gap: 8px; }
+  .grupo-dono > h5 { padding: 6px 12px; }
+  .gaveta .campo textarea { min-height: 48px; }
+}
 .gaveta footer { padding: 14px 20px; border-top: 1px solid var(--borda); display: flex; gap: 10px; flex-wrap: wrap; }
 .gaveta footer .btn-primario { flex: 1; }
 .grupo-dono { border-radius: 12px; border: 1px solid var(--borda); overflow: hidden; }
