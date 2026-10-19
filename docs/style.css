@@ -468,3 +468,11 @@ table.resumo .idade { font-size: .78rem; margin: 0; }
 .funil-tab tbody tr { cursor: pointer; }
 .funil-tab tbody tr:hover td { background: var(--magenta-claro); }
 @media (max-width: 760px) { .funil-l { grid-template-columns: 1fr 44px; } .funil-barra { grid-column: 1 / -1; order: 3; } .funil-d { grid-column: 1 / -1; order: 4; } }
+
+/* Datas dd/mm/aaaa (datas-br.js) */
+.data-br { position: relative; display: block; width: 100%; }
+.campo .data-br input[type=text] { padding-right: 40px; font-variant-numeric: tabular-nums; }
+.campo .data-br input.invalida { border-color: #d6336c; }
+.data-br-nativo { position: absolute; right: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+.data-br-cal { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--texto); cursor: pointer; opacity: .75; }
+.data-br-cal:hover { opacity: 1; background: color-mix(in srgb, var(--azul) 10%, transparent); }
