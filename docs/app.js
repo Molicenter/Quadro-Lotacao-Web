@@ -739,7 +739,7 @@ function confirmarZerar(r) {
 // TELA: ATUALIZAR BANCO (importar o Excel do Senior)
 // ============================================================
 // colunas que o app guarda (o resto do Excel, inclusive CPF e Nascimento, é descartado aqui no navegador)
-const COLUNAS = { Loja: "l", Dept: "d", "Função": "f", "Situação": "s", Nome: "n", "Descrição (Escala)": "e", "Data Afastamento": "da", "Admissão": "ad" };
+const COLUNAS = { Loja: "l", Dept: "d", "Função": "f", "Situação": "s", Nome: "n", "Descrição (Escala)": "e", "Data Afastamento": "da", "Admissão": "ad", DSR1: "d1", DSR2: "d2" };   // DSR1/DSR2 são opcionais (vão para a Escala 5x2)
 let importacao = null;   // { arquivo, linhas, cabecalhos, resumo }
 
 function telaImportar() {
@@ -846,7 +846,7 @@ async function lerArquivo(arquivo) {
       const lj = Number(String(loja ?? "").replace(",", "."));
       const t = (n) => { const x = get(n); return x == null ? "" : textoCelula(x); };
       out.push({ l: Number.isFinite(lj) ? Math.trunc(lj) : 0, d: t("Dept"), f: t("Função"), s: t("Situação"), n: nome == null ? "" : String(nome),
-        e: t("Descrição (Escala)"), da: dataCelula(get("Data Afastamento")), ad: dataCelula(get("Admissão")) });
+        e: t("Descrição (Escala)"), da: dataCelula(get("Data Afastamento")), ad: dataCelula(get("Admissão")), d1: t("DSR1"), d2: t("DSR2") });
     }
     if (!out.length) throw new Error(MENSAGENS.ARQUIVO_VAZIO);
     const resumo = await rpc("ql_web_importar", { p_token: sessao.token, p_linhas: out, p_arquivo: arquivo.name, p_gravar: false });
